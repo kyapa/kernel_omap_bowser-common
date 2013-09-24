@@ -329,7 +329,7 @@ static void __init l2x0_unlock(__u32 cache_id)
 		lockregs = 8;
 	else
 		/* L210 and unknown types */
-		lockregs = 1;
+		lockregs = 2;
 
 	for (i = 0; i < lockregs; i++) {
 		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D0 +
