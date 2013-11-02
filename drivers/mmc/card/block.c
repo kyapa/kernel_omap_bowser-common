@@ -719,6 +719,17 @@ static int mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 	unsigned int from, nr, arg;
 	int err = 0;
 
+	/*
+	 * The Nexus 7 ships with several emmc chips. The ext4 discard
+	 * mount option is required to prevent performance issues on
+	 * one chip, but hurts performance on others. However, if this
+	 * is a secure erase request, we want this to work on all chips,
+	 * as this is used in factory wipe. So this test will enable the
+	 * discard option for the one chip, and secure erase for all chips.
+	 */
+	if (!(req->cmd_flags & REQ_SECURE) && !(card->cid.manfid == 0x15))
+   		goto out;
+
 	if (!mmc_can_erase(card)) {
 		err = -EOPNOTSUPP;
 		goto out;
@@ -727,7 +738,9 @@ static int mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 	from = blk_rq_pos(req);
 	nr = blk_rq_sectors(req);
 
-	if (mmc_can_trim(card))
+	if (mmc_can_discard(card))
+		arg = MMC_DISCARD_ARG;
+	else if (mmc_can_trim(card))
 		arg = MMC_TRIM_ARG;
 	else
 		arg = MMC_ERASE_ARG;
@@ -1160,9 +1173,16 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	}
 
 	if (req->cmd_flags & REQ_DISCARD) {
+/*
+** HASH:
+** Patching *possible* TRIM bug in Samsung MAG2GA Chips
+** -- also removing the secdiscard request to be safe
+*/
+#if 0
 		if (req->cmd_flags & REQ_SECURE)
 			ret = mmc_blk_issue_secdiscard_rq(mq, req);
 		else
+#endif
 			ret = mmc_blk_issue_discard_rq(mq, req);
 	} else if (req->cmd_flags & REQ_FLUSH) {
 		ret = mmc_blk_issue_flush(mq, req);
